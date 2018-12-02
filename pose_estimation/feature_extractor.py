@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import math
 from pose_detector import PoseDetector, draw_person_pose
 from hand_detector import HandDetector, draw_hand_keypoints
 
@@ -119,6 +120,9 @@ class Keypoints:
 
     def to_list(self):
         return [self.body, self.left, self.right]
+
+    def distance_formula(a, b):
+        return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 print("Loading pose detection model...")
 pose_detector = PoseDetector("posenet", "models/coco_posenet.npz", device=0)
