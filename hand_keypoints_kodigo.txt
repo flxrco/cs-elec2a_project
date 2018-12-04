@@ -1,0 +1,22 @@
+LEFT:
+[1093, 1055, 0.57056403] - wrist
+[1036, 1021, 0.80130482] - thumb_palm
+[976, 975, 0.79256117] - thumb_proximal
+[958, 928, 0.81898779] - thumb_middle
+[928, 884, 0.8040961] - thumb_distal
+[1041, 896, 0.7195195] - index_palm
+[1033, 809, 0.80201161] - index_proximal
+[1019, 761, 0.75331002] - index_middle
+[1005, 716, 0.73915017] - index_distal
+[1097, 895, 0.76117116] - middle_palm
+[1098, 802, 0.78066146] - middle_proximal
+[1100, 743, 0.86812007] - middle_midle
+[1112, 696, 0.81455433] - middle_distal
+[1131, 898, 0.77302819] - ring_palm
+[1154, 819, 0.7204873] - ring_proximal
+[1164, 761, 0.82376546] - ring_middle
+[1176, 715, 0.75413233] - ring_distal
+[1175, 914, 0.81024879] - pinky_palm
+[1208, 855, 0.7150709] - pinky_proximal
+[1236, 822, 0.75442892] - pinky_middle
+[1253, 789, 0.82003605] - pinky_distal
