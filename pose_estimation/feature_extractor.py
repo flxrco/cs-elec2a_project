@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import math
+import pprint
 from pose_detector import PoseDetector, draw_person_pose
 from hand_detector import HandDetector, draw_hand_keypoints
 
@@ -122,14 +123,33 @@ class Keypoints:
         return Keypoints(body, left, right)
 
     def to_dict(self):
+        labels = {
+            "body": ["nose", "neck", "shoulder-r", "elbow-r", "wrist-r", "shoulder-l", "elbow-l", "wrist-l", "hip-r", "knee-r", "ankle-r", "hip-l", "knee-l", "ankle-l", "eye-r", "eye-l", "ear-r", "ear-l"],
+            "hand": ["wirst", "thumb-palm", "thumb-proximal", "thumb-middle", "thumb-distal", "index-palm", "index-proximal", "index-middle", "index-distal", "middle-palm", "middle-proximal", "middle-middle", "middle-distal", "ring-palm", "ring-proximal", "ring-middle", "ring-distal", "pinky-palm", "pinky-proximal", "pinky_middle", "pinky-distal"]
+        }
+
+        res = {
+            "body": {},
+            "left": {},
+            "right": {}
+        }
+
+        def build_dict(kp_arr, label_arr, res_dict):
+            for i in range(len(kp_arr)):
+                res_dict[label_arr[i]] = kp_arr[i]
+
+        build_dict(self.body, labels["body"], res["body"])
+        build_dict(self.right, labels["hand"], res["right"])
+        build_dict(self.left, labels["hand"], res["left"])
+
+        return res
+
+    def to_list(self):
         return {
             "body": self.body,
             "left": self.left,
             "right": self.right
         }
-
-    def to_list(self):
-        return [self.body, self.left, self.right]
 
     def distance_formula(a, b):
         return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
@@ -157,22 +177,14 @@ if __name__ == '__main__':
     output = extractor.extract_features(args.src)
     print("Extraction complete. Time elapsed: %s" % time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
-    keypoint_dict = output.get_keypoints().to_dict()
+    pp = pprint.PrettyPrinter(indent=4)
+
     print("RAW KEYPOINTS:")
-    for key in keypoint_dict:
-        print("%s KEYPOINTS" % key)
-        for kp in keypoint_dict[key]:
-            print(kp)
-        print()
+    pp.pprint(output.get_keypoints().to_dict())
 
     if args.norm:
-        norm_dict = output.get_keypoints().normalize().to_dict()
-        print("RAW NORMALIZED:")
-        for key in norm_dict:
-            print("%s KEYPOINTS" % key)
-            for kp in norm_dict[key]:
-                print(kp)
-            print()
+        print("NORMALIZED KEYPOINTS:")
+        pp.pprint(output.get_keypoints().normalize().to_dict())
 
     if args.dest is not None:
         print("Saving representation to %s" % args.dest)
