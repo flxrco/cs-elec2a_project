@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import cv2
 import math
 import pprint
@@ -10,9 +11,15 @@ import chainer
 from entity import params
 import time
 
+labels = {
+    "body": ["nose", "neck", "shoulder-r", "elbow-r", "wrist-r", "shoulder-l", "elbow-l", "wrist-l", "hip-r", "knee-r", "ankle-r", "hip-l", "knee-l", "ankle-l", "eye-r", "eye-l", "ear-r", "ear-l"],
+    "hand": ["wirst", "thumb-palm", "thumb-proximal", "thumb-middle", "thumb-distal", "index-palm", "index-proximal", "index-middle", "index-distal", "middle-palm", "middle-proximal", "middle-middle", "middle-distal", "ring-palm", "ring-proximal", "ring-middle", "ring-distal", "pinky-palm", "pinky-proximal", "pinky_middle", "pinky-distal"]
+}
+
 chainer.using_config('enable_backprop', False)
 
 class FeatureExtractor:
+
     def __init__(self, pose_detector, hand_detector):
         self.pose_detector = pose_detector
         self.hand_detector = hand_detector
@@ -37,35 +44,32 @@ class FeatureExtractor:
         for person_pose in person_pose_array:
 
             res["body"] = [list(k) for k in person_pose]
-
             unit_length = self.pose_detector.get_unit_length(person_pose)
+            hands = self.pose_detector.crop_hands(img, person_pose, unit_length)
 
             def record_hand(hand_type):
-                hand_img = hands[hand_type]["img"]
-                bbox = hands[hand_type]["bbox"]
-                hand_keypoints = self.hand_detector(hand_img, hand_type=hand_type)
+                if hands[hand_type] is not None:
+                    hand_img = hands[hand_type]["img"]
+                    bbox = hands[hand_type]["bbox"]
+                    hand_keypoints = self.hand_detector(hand_img, hand_type=hand_type)
+                    res[hand_type] = []
 
-                res[hand_type] = []
+                    for k in hand_keypoints:
+                        if k is not None:
+                            k = [k[0] + bbox[0], k[1] + bbox[1], k[2]]
 
-                for k in hand_keypoints:
-                    if k is not None:
-                        k = [k[0] + bbox[0], k[1] + bbox[1], k[2]]
+                        res[hand_type].append(k)
 
-                    res[hand_type].append(k)
-
-                res["%s_bbox" % hand_type] = bbox
+                    res["%s_bbox" % hand_type] = bbox
 
             # hands estimation
-            hands = self.pose_detector.crop_hands(img, person_pose, unit_length)
-            if hands["left"] is not None:
-                record_hand("left")
-
-            if hands["right"] is not None:
-                record_hand("right")
+            record_hand("left")
+            record_hand("right")
 
         return ExtractorOutput(res, img)
 
 class ExtractorOutput:
+
     def __init__(self, keypoints, img):
         self.keypoints = keypoints
         self.img = img
@@ -76,17 +80,22 @@ class ExtractorOutput:
         res_img = cv2.addWeighted(img, 0.6, draw_person_pose(img, person_pose_array), 0.4, 0)
 
         def represent_hand(hand_type):
-            bbox = self.keypoints["%s_bbox" % hand_type]
-            # hand_keypoints = [[k[0] - bbox[0], k[1] - bbox[1], k[2]] for k in self.keypoints[hand_type]]
-            nonlocal res_img
-            hand_keypoints = []
-            for k in self.keypoints[hand_type]:
-                if k is not None:
-                    k = [k[0] - bbox[0], k[1] - bbox[1], k[2]]
+            
+            if self.keypoints[hand_type] is not None:
+                bbox = self.keypoints["%s_bbox" % hand_type]
+                # hand_keypoints = [[k[0] - bbox[0], k[1] - bbox[1], k[2]] for k in self.keypoints[hand_type]]
+                nonlocal res_img
+                hand_keypoints = []
+                for k in self.keypoints[hand_type]:
+                    if k is not None:
+                        if sum(k) != 0:
+                            k = [k[0] - bbox[0], k[1] - bbox[1], k[2]]
+                        else:
+                            k = None
 
-                hand_keypoints.append(k)
-            res_img = draw_hand_keypoints(res_img, hand_keypoints, (bbox[0], bbox[1]))
-            cv2.rectangle(res_img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 255, 255), 1)
+                    hand_keypoints.append(k)
+                res_img = draw_hand_keypoints(res_img, hand_keypoints, (bbox[0], bbox[1]))
+                cv2.rectangle(res_img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 255, 255), 1)
 
         represent_hand("left")
         represent_hand("right")
@@ -100,10 +109,25 @@ class ExtractorOutput:
         return Keypoints(self.keypoints["body"], self.keypoints["left"], self.keypoints["right"])
 
 class Keypoints:
+
     def __init__(self, body, left, right):
         self.body = body
         self.left = left
         self.right = right
+
+        if self.left is None:
+            self.left = [None for i in range(len(labels["hand"]))]
+
+        if self.right is None:
+            self.right = [None for i in range(len(labels["hand"]))]
+
+        for i in range(len(labels["hand"])):
+            if self.right[i] is None:
+                self.right[i] = [0.0, 0.0, 0.0]
+
+            if self.left[i] is None:
+                self.left[i] = [0.0, 0.0, 0.0]
+
 
     def normalize(self):
         offset = self.body[1] # keypoint of the neck
@@ -112,7 +136,8 @@ class Keypoints:
             res = []
             for k in keypoints_array:
                 if k is not None:
-                    k = [k[0] - offset[0], k[1] - offset[1], k[2]]
+                    if (sum(k) != 0.0):
+                        k = [k[0] - offset[0], k[1] - offset[1], k[2]]
                 res.append(k)
             return res
 
@@ -123,11 +148,6 @@ class Keypoints:
         return Keypoints(body, left, right)
 
     def to_dict(self):
-        labels = {
-            "body": ["nose", "neck", "shoulder-r", "elbow-r", "wrist-r", "shoulder-l", "elbow-l", "wrist-l", "hip-r", "knee-r", "ankle-r", "hip-l", "knee-l", "ankle-l", "eye-r", "eye-l", "ear-r", "ear-l"],
-            "hand": ["wirst", "thumb-palm", "thumb-proximal", "thumb-middle", "thumb-distal", "index-palm", "index-proximal", "index-middle", "index-distal", "middle-palm", "middle-proximal", "middle-middle", "middle-distal", "ring-palm", "ring-proximal", "ring-middle", "ring-distal", "pinky-palm", "pinky-proximal", "pinky_middle", "pinky-distal"]
-        }
-
         res = {
             "body": {},
             "left": {},
@@ -151,10 +171,36 @@ class Keypoints:
             "right": self.right
         }
 
+    def to_flat_dict(self):
+        flat_dict = {}
+        kp_dict = self.to_dict()
+        dims = ["x", "y", "z"]
+
+        for key in kp_dict:
+            for label in kp_dict[key]:
+                coords = kp_dict[key][label]
+                for i in range(len(dims)):
+                    flat_dict["%s_%s_%s" % (key, label, dims[i])] = [round(float(coords[i]), 2)]
+
+
+        return flat_dict
+
     def distance_formula(a, b):
         return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
+def build_template():
+    template = {}
 
+    def build_dict(label_arr, prefix):
+        for label in label_arr:
+            for dim in ["x", "y", "z"]:
+                template["%s_%s_%s" % (prefix, label, dim)] = []
+
+    build_dict(labels["body"], "body")
+    build_dict(labels["hand"], "left")
+    build_dict(labels["hand"], "right")
+
+    return template
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature Extractor')
@@ -162,6 +208,7 @@ if __name__ == '__main__':
     parser.add_argument('--dest', default=None, help='Destimation image filepath')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--norm', type=bool, default=False, help='Normalize keypoints')
+    pars
     args = parser.parse_args()
 
     start_time = time.time()
@@ -177,15 +224,15 @@ if __name__ == '__main__':
     output = extractor.extract_features(args.src)
     print("Extraction complete. Time elapsed: %s" % time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
-    pp = pprint.PrettyPrinter(indent=4)
-
-    print("RAW KEYPOINTS:")
-    pp.pprint(output.get_keypoints().to_dict())
+    keypoints = output.get_keypoints()
 
     if args.norm:
-        print("NORMALIZED KEYPOINTS:")
-        pp.pprint(output.get_keypoints().normalize().to_dict())
+        keypoints = keypoints().normalize()
+
+    print(keypoints.to_flat_dict())
 
     if args.dest is not None:
         print("Saving representation to %s" % args.dest)
         output.to_image(args.dest)
+
+    print("Elapsed: %s" % time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
