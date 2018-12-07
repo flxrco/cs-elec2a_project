@@ -40,7 +40,7 @@ if __name__ == '__main__':
         if args.imgdest is not None:
             out.to_image(os.path.join(args.imgdest, img))
         
-        kp = out.get_keypoints().normalize().to_flat_dict()
+        kp = out.get_keypoints().to_flat_dict()
         details = img.split(".")[0].split("_")
         kp["class"] = [details[0]]
         kp["actor"] = [details[1]]
