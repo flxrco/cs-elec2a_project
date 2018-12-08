@@ -130,20 +130,19 @@ class Keypoints:
 
 
     def normalize(self):
-        offset = self.body[1] # keypoint of the neck
 
-        def normalize_segment(keypoints_array):
+        def normalize_segment(keypoints_array, offset):
             res = []
             for k in keypoints_array:
                 if k is not None:
-                    if (sum(k) != 0.0):
+                    if sum(k) is not 0.0:
                         k = [k[0] - offset[0], k[1] - offset[1], k[2]]
                 res.append(k)
             return res
 
-        body = normalize_segment(self.body)
-        left = normalize_segment(self.left)
-        right = normalize_segment(self.right)
+        body = normalize_segment(self.body, self.body[1])
+        left = normalize_segment(self.left, self.left[0])
+        right = normalize_segment(self.right, self.right[0])
 
         return Keypoints(body, left, right)
 
@@ -208,7 +207,6 @@ if __name__ == '__main__':
     parser.add_argument('--dest', default=None, help='Destimation image filepath')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--norm', type=bool, default=False, help='Normalize keypoints')
-    pars
     args = parser.parse_args()
 
     start_time = time.time()
@@ -227,7 +225,7 @@ if __name__ == '__main__':
     keypoints = output.get_keypoints()
 
     if args.norm:
-        keypoints = keypoints().normalize()
+        keypoints = keypoints.normalize()
 
     print(keypoints.to_flat_dict())
 
