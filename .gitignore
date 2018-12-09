@@ -9,3 +9,4 @@ result.png
 *.caffemodel
 *.chainermodel
 *.npz
+pose_estimation/dataset/representation

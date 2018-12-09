@@ -23,7 +23,7 @@ if __name__ == '__main__':
     print("Loading complete. Time elapsed: %s" % time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
     extractor = FeatureExtractor(pose_detector, hand_detector)
-    data = build_template()
+    data = Keypoints.build_template()
     data["class"] = []
     data["actor"] = []
 

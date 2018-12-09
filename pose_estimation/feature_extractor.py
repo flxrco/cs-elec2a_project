@@ -11,10 +11,12 @@ import chainer
 from entity import params
 import time
 
-labels = {
+LABELS = {
     "body": ["nose", "neck", "shoulder-r", "elbow-r", "wrist-r", "shoulder-l", "elbow-l", "wrist-l", "hip-r", "knee-r", "ankle-r", "hip-l", "knee-l", "ankle-l", "eye-r", "eye-l", "ear-r", "ear-l"],
-    "hand": ["wirst", "thumb-palm", "thumb-proximal", "thumb-middle", "thumb-distal", "index-palm", "index-proximal", "index-middle", "index-distal", "middle-palm", "middle-proximal", "middle-middle", "middle-distal", "ring-palm", "ring-proximal", "ring-middle", "ring-distal", "pinky-palm", "pinky-proximal", "pinky_middle", "pinky-distal"]
+    "hand": ["wirst", "thumb-palm", "thumb-proximal", "thumb-middle", "thumb-distal", "index-palm", "index-proximal", "index-middle", "index-distal", "middle-palm", "middle-proximal", "middle-middle", "middle-distal", "ring-palm", "ring-proximal", "ring-middle", "ring-distal", "pinky-palm", "pinky-proximal", "pinky-middle", "pinky-distal"]
 }
+
+DIMS = ["x", "y", "z"]
 
 chainer.using_config('enable_backprop', False)
 
@@ -116,12 +118,12 @@ class Keypoints:
         self.right = right
 
         if self.left is None:
-            self.left = [None for i in range(len(labels["hand"]))]
+            self.left = [None for i in range(len(LABELS["hand"]))]
 
         if self.right is None:
-            self.right = [None for i in range(len(labels["hand"]))]
+            self.right = [None for i in range(len(LABELS["hand"]))]
 
-        for i in range(len(labels["hand"])):
+        for i in range(len(LABELS["hand"])):
             if self.right[i] is None:
                 self.right[i] = [0.0, 0.0, 0.0]
 
@@ -157,9 +159,9 @@ class Keypoints:
             for i in range(len(kp_arr)):
                 res_dict[label_arr[i]] = kp_arr[i]
 
-        build_dict(self.body, labels["body"], res["body"])
-        build_dict(self.right, labels["hand"], res["right"])
-        build_dict(self.left, labels["hand"], res["left"])
+        build_dict(self.body, LABELS["body"], res["body"])
+        build_dict(self.right, LABELS["hand"], res["right"])
+        build_dict(self.left, LABELS["hand"], res["left"])
 
         return res
 
@@ -173,33 +175,38 @@ class Keypoints:
     def to_flat_dict(self):
         flat_dict = {}
         kp_dict = self.to_dict()
-        dims = ["x", "y", "z"]
 
         for key in kp_dict:
             for label in kp_dict[key]:
                 coords = kp_dict[key][label]
-                for i in range(len(dims)):
-                    flat_dict["%s_%s_%s" % (key, label, dims[i])] = [round(float(coords[i]), 2)]
+                for i in range(len(DIMS)):
+                    flat_dict["%s_%s_%s" % (key, label, DIMS[i])] = [round(float(coords[i]), 2)]
 
 
         return flat_dict
 
+    def compute_distance(self, kp):
+        body = [Keypoints.distance_formula(self.body[i], kp.body[i]) for i in range(len(LABELS["body"]))]
+        left = [Keypoints.distance_formula(self.left[i], kp.left[i]) for i in range(len(LABELS["hand"]))]
+        right = [Keypoints.distance_formula(self.right[i], kp.right[i]) for i in range(len(LABELS["hand"]))]
+        return 3 * (sum(left) + sum(right)) + sum(body)
+
     def distance_formula(a, b):
         return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
-def build_template():
-    template = {}
+    def build_template():
+        template = {}
 
-    def build_dict(label_arr, prefix):
-        for label in label_arr:
-            for dim in ["x", "y", "z"]:
-                template["%s_%s_%s" % (prefix, label, dim)] = []
+        def build_dict(label_arr, prefix):
+            for label in label_arr:
+                for dim in ["x", "y", "z"]:
+                    template["%s_%s_%s" % (prefix, label, dim)] = []
 
-    build_dict(labels["body"], "body")
-    build_dict(labels["hand"], "left")
-    build_dict(labels["hand"], "right")
+        build_dict(LABELS["body"], "body")
+        build_dict(LABELS["hand"], "left")
+        build_dict(LABELS["hand"], "right")
 
-    return template
+        return template
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature Extractor')
