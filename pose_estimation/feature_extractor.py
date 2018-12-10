@@ -132,12 +132,11 @@ class Keypoints:
 
 
     def normalize(self):
-
         def normalize_segment(keypoints_array, offset):
             res = []
             for k in keypoints_array:
                 if k is not None:
-                    if sum(k) is not 0.0:
+                    if sum(k) != 0.0:
                         k = [k[0] - offset[0], k[1] - offset[1], k[2]]
                 res.append(k)
             return res
@@ -147,6 +146,68 @@ class Keypoints:
         right = normalize_segment(self.right, self.right[0])
 
         return Keypoints(body, left, right)
+
+    def rescale(self, body_width=500, left_width=500, right_width=500):
+        kp_list = self.to_list()
+        
+        new_kp = {
+            "body": [],
+            "left": [],
+            "right": []
+        }
+
+        widths = {
+            "body": body_width,
+            "left": left_width,
+            "right": right_width
+        }
+
+        coords_bbox = {}
+
+        for key in kp_list:
+            coords_bbox[key] = {}
+
+            coords_bbox[key]["min"] = (
+                min([kp[0] for kp in kp_list[key]]),
+                min([kp[1] for kp in kp_list[key]])
+            )
+
+            coords_bbox[key]["max"] = (
+                max([kp[0] for kp in kp_list[key]]),
+                max([kp[1] for kp in kp_list[key]])
+            )
+
+        def calculate_bbox(min_dims, max_dims):
+            min_x, min_y = min_dims
+            max_x, max_y = max_dims
+
+            return (abs(max_x - min_x), abs(max_y - min_y)) # (width, height)
+
+        for key in kp_list:
+            new_width = widths[key]
+            coords = coords_bbox[key]
+            width, height = calculate_bbox(coords["min"], coords["max"])
+            
+            if width == 0 and height == 0:
+                for i in range(len(kp_list[key])):
+                    new_kp[key].append([0.0, 0.0, 0.0])
+                continue
+
+            new_height = height * (width / new_width)
+
+            scale_factor = [
+                float(new_height) / height,
+                float(new_width) / width
+            ]
+
+            for kp in kp_list[key]:
+                new = [0, 0, kp[2]]
+                for i in range(len(scale_factor)):
+                    new[i] = kp[i] * scale_factor[i]
+                new_kp[key].append(new)
+
+        return Keypoints(new_kp["body"], new_kp["left"], new_kp["right"])
+
 
     def to_dict(self):
         res = {
